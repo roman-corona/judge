@@ -328,7 +328,9 @@ let entities, bullets, particles;
 let keys = {}, shootCooldown, roadOffset, combo, comboTimer;
 let shakeFrames = 0, spawnTimer = null, gameRunning = false;
 
-const player = { x:0, y:0, w:38, h:68, baseSpeed:7 };
+const player = { x:381, y:0, w:38, h:68, baseSpeed:7 };
+// y set properly after canvas height is known
+window.addEventListener('DOMContentLoaded', () => { player.y = canvas.height - 170; });
 
 // ── Pre-generate static buildings ───────────────────────────
 const BUILDINGS = Array.from({length:16}, (_, i) => {
@@ -627,64 +629,71 @@ function drawRoad() {
 }
 
 function drawCar(x, y, w, h, bodyColor, isPlayer, hitFlash) {
-    const r = 5;
     ctx.save();
 
-    if (isPlayer) { ctx.shadowColor='#2255ff'; ctx.shadowBlur=20; }
+    // ── Body ──────────────────────────────────────────────────
+    if (isPlayer) {
+        ctx.shadowColor = '#2255ff';
+        ctx.shadowBlur  = 18;
+    }
+    ctx.fillStyle = isPlayer ? '#1a66ee' : bodyColor;
+    ctx.fillRect(x, y + h * 0.14, w, h * 0.72);
 
-    // Body
-    const bg = ctx.createLinearGradient(x,y,x+w,y+h);
-    bg.addColorStop(0, lighten(bodyColor,32)); bg.addColorStop(1, bodyColor);
-    ctx.fillStyle = bg;
-    rrect(x, y+h*0.12, w, h*0.74, r); ctx.fill();
+    // ── Roof ──────────────────────────────────────────────────
+    ctx.shadowBlur = 0;
+    ctx.fillStyle  = isPlayer ? '#003399' : darken(bodyColor, 28);
+    ctx.fillRect(x + w * 0.1, y + h * 0.04, w * 0.8, h * 0.46);
 
-    // Roof
-    const rc = isPlayer ? '#001f88' : darken(bodyColor,22);
-    const rg = ctx.createLinearGradient(x,y,x+w,y);
-    rg.addColorStop(0, lighten(rc,18)); rg.addColorStop(1, rc);
-    ctx.fillStyle = rg;
-    rrect(x+w*0.1, y+h*0.04, w*0.8, h*0.48, r); ctx.fill();
+    // ── Windshield ────────────────────────────────────────────
+    ctx.fillStyle = 'rgba(160,210,255,0.55)';
+    const wsY = isPlayer ? y + h * 0.07 : y + h * 0.31;
+    ctx.fillRect(x + w * 0.14, wsY, w * 0.72, h * 0.2);
+    // Glare
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(x + w * 0.16, wsY + 2, w * 0.18, h * 0.06);
 
-    // Windshield
-    ctx.fillStyle = 'rgba(150,205,255,0.45)';
-    const wsY = isPlayer ? y+h*0.07 : y+h*0.32;
-    rrect(x+w*0.14, wsY, w*0.72, h*0.22, 3); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(x+w*0.16, wsY+2, w*0.16, h*0.06);
-
-    // Wheels
+    // ── Wheels ────────────────────────────────────────────────
     ctx.fillStyle = '#111';
-    [[x-w*0.06, y+h*0.17],[x+w*0.78, y+h*0.17],[x-w*0.06, y+h*0.66],[x+w*0.78, y+h*0.66]].forEach(([wx,wy]) => {
-        rrect(wx, wy, w*0.2, h*0.14, 2); ctx.fill();
-    });
-    ctx.fillStyle='#333';
-    [[x+w*0.03, y+h*0.24],[x+w*0.79+w*0.1, y+h*0.24],[x+w*0.03, y+h*0.73],[x+w*0.79+w*0.1, y+h*0.73]].forEach(([cx,cy])=>{
-        ctx.beginPath(); ctx.arc(cx, cy, w*0.055, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(x - 4,          y + h * 0.17, w * 0.22, h * 0.13);
+    ctx.fillRect(x + w - w*0.22 + 4, y + h * 0.17, w * 0.22, h * 0.13);
+    ctx.fillRect(x - 4,          y + h * 0.66, w * 0.22, h * 0.13);
+    ctx.fillRect(x + w - w*0.22 + 4, y + h * 0.66, w * 0.22, h * 0.13);
+    // Hubcaps
+    ctx.fillStyle = '#444';
+    [[x + w*0.07, y+h*0.235],[x + w*0.815, y+h*0.235],
+     [x + w*0.07, y+h*0.725],[x + w*0.815, y+h*0.725]].forEach(([cx,cy]) => {
+        ctx.beginPath(); ctx.arc(cx, cy, w*0.06, 0, Math.PI*2); ctx.fill();
     });
 
     if (isPlayer) {
-        // Light bar
-        const tick = Math.floor(Date.now()/110)%2;
-        ctx.shadowBlur=22; ctx.shadowColor=tick?'#ff2222':'#3344ff';
-        ctx.fillStyle=tick?'#ff3333':'#2244ff';
-        ctx.fillRect(x+2, y+h*0.12, w*0.45, 7);
-        ctx.shadowColor=tick?'#3344ff':'#ff2222';
-        ctx.fillStyle=tick?'#3344ff':'#ff3333';
-        ctx.fillRect(x+w*0.5, y+h*0.12, w*0.46, 7);
-        ctx.shadowBlur=0;
-        // Headlights
-        ctx.shadowColor='#ffffaa'; ctx.shadowBlur=14; ctx.fillStyle='#ffffcc';
-        ctx.fillRect(x+w*0.05, y+h*0.84, w*0.22, 5);
-        ctx.fillRect(x+w*0.73, y+h*0.84, w*0.22, 5);
+        // ── Flashing light bar ────────────────────────────────
+        const tick = Math.floor(Date.now() / 115) % 2;
+        ctx.shadowColor = tick ? '#ff2222' : '#2244ff';
+        ctx.shadowBlur  = 20;
+        ctx.fillStyle   = tick ? '#ff3333' : '#2244ff';
+        ctx.fillRect(x + 2,      y + h * 0.13, w * 0.45, 7);
+        ctx.shadowColor = tick ? '#2244ff' : '#ff2222';
+        ctx.fillStyle   = tick ? '#2244ff' : '#ff3333';
+        ctx.fillRect(x + w * 0.5, y + h * 0.13, w * 0.46, 7);
+        ctx.shadowBlur  = 0;
+        // ── Headlights ────────────────────────────────────────
+        ctx.shadowColor = '#ffffaa'; ctx.shadowBlur = 12;
+        ctx.fillStyle   = '#ffffcc';
+        ctx.fillRect(x + 2,          y + h * 0.84, w * 0.22, 5);
+        ctx.fillRect(x + w - w*0.24, y + h * 0.84, w * 0.22, 5);
     } else {
-        ctx.shadowColor='#ff4400'; ctx.shadowBlur=8; ctx.fillStyle='#ff3300';
-        ctx.fillRect(x+w*0.05, y+h*0.86, w*0.18, 4);
-        ctx.fillRect(x+w*0.77, y+h*0.86, w*0.18, 4);
+        // ── Tail lights ───────────────────────────────────────
+        ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8;
+        ctx.fillStyle   = '#ff3300';
+        ctx.fillRect(x + 2,          y + h * 0.87, w * 0.18, 4);
+        ctx.fillRect(x + w - w*0.2,  y + h * 0.87, w * 0.18, 4);
         if (hitFlash) {
-            ctx.shadowBlur=0; ctx.fillStyle='rgba(255,255,255,0.32)';
-            rrect(x, y+h*0.12, w, h*0.74, r); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle  = 'rgba(255,255,255,0.35)';
+            ctx.fillRect(x, y + h * 0.14, w, h * 0.72);
         }
     }
+
     ctx.restore();
 }
 
