@@ -173,7 +173,7 @@
 <div id="float-container"></div>
 
 <canvas id="gameCanvas"></canvas>
-<div id="controls-hint">ARROWS: Drive &nbsp;|&nbsp; SPACE: Shoot &nbsp;|&nbsp; S: Siren on/off</div>
+<div id="controls-hint">ARROWS: Drive &nbsp;|&nbsp; SPACE: Shoot &nbsp;|&nbsp; S: Siren &nbsp;|&nbsp; R: Radio</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -184,43 +184,125 @@ function resumeAC() { if (AC.state === 'suspended') AC.resume(); }
 
 // ── Siren ────────────────────────────────────────────────────
 let sirenActive = false;
-let _sirenNodes = [];   // keep refs so we can stop them
+let _sirenNodes = [], _sirenLFO = null, _sirenModeTimer = null, _sirenMode = 0;
 
 function startSiren() {
     if (sirenActive) return;
     sirenActive = true;
 
-    const masterGain = AC.createGain();
-    masterGain.gain.value = 0.6;
-    masterGain.connect(AC.destination);
+    // Lowpass tames the sawtooth buzz so it reads as an electronic siren
+    const lp = AC.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2600; lp.Q.value = 1;
+    const master = AC.createGain();
+    master.gain.value = 0.5;
+    lp.connect(master); master.connect(AC.destination);
 
-    // Two-tone wail: low saw + high square, each LFO-modulated
-    [[600, 220, 0.85, 'sawtooth', 0.5],
-     [900, 150, 1.15, 'square',   0.25]].forEach(([freq, depth, rate, type, vol]) => {
-        const osc  = AC.createOscillator();
-        const lfo  = AC.createOscillator();
-        const lfog = AC.createGain();
-        const g    = AC.createGain();
-        osc.type          = type;
-        osc.frequency.value = freq;
-        lfo.frequency.value = rate;
-        lfog.gain.value   = depth;
-        g.gain.value      = vol;
-        lfo.connect(lfog); lfog.connect(osc.frequency);
-        osc.connect(g);    g.connect(masterGain);
-        lfo.start(); osc.start();
-        _sirenNodes.push(osc, lfo, masterGain);
-    });
+    // Single dominant swept tone — the hallmark of a US police siren.
+    // Two slightly detuned saws layered for that thick electronic body.
+    const osc  = AC.createOscillator();
+    const osc2 = AC.createOscillator();
+    osc.type = osc2.type = 'sawtooth';
+    osc.frequency.value = osc2.frequency.value = 850;   // sweep centre
+    osc2.detune.value = 11;
+    const og = AC.createGain(); og.gain.value = 0.55;
+    osc.connect(og); osc2.connect(og); og.connect(lp);
+
+    // Triangle LFO sweeps the pitch up and down (the wail/yelp motion)
+    const lfo  = AC.createOscillator();
+    lfo.type = 'triangle';
+    lfo.frequency.value = 0.55;                          // start in slow "wail"
+    const lfoDepth = AC.createGain();
+    lfoDepth.gain.value = 480;                           // ≈ 370–1330 Hz sweep
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(osc.frequency);
+    lfoDepth.connect(osc2.frequency);
+
+    osc.start(); osc2.start(); lfo.start();
+    _sirenNodes = [osc, osc2, lfo, master];
+    _sirenLFO = lfo;
+
+    // Auto-cycle wail → yelp → fast yelp every 5s, like a real pursuit
+    _sirenMode = 0;
+    _sirenModeTimer = setInterval(() => {
+        if (!sirenActive || !_sirenLFO) return;
+        _sirenMode = (_sirenMode + 1) % 3;
+        const rate = _sirenMode === 0 ? 0.55 : _sirenMode === 1 ? 3.4 : 6.5;
+        _sirenLFO.frequency.linearRampToValueAtTime(rate, AC.currentTime + 0.25);
+    }, 5000);
 }
 
 function stopSiren() {
     if (!sirenActive) return;
     sirenActive = false;
+    if (_sirenModeTimer) { clearInterval(_sirenModeTimer); _sirenModeTimer = null; }
     _sirenNodes.forEach(n => { try { n.stop(); } catch(e){} });
-    _sirenNodes = [];
+    _sirenNodes = []; _sirenLFO = null;
 }
 
 function toggleSiren() { sirenActive ? stopSiren() : startSiren(); }
+
+// ── Radio chatter (walkie-talkie dispatch) ───────────────────
+const RADIO_LINES = [
+    "Officer Javi, please respond.",
+    "Dispatch to Unit 902, suspect headed your way.",
+    "All units, be advised, pursuit in progress.",
+    "Unit 902, what is your status?",
+    "Nice work out there, Officer Javi.",
+    "Control to 902, keep those civilians clear.",
+    "Be advised, armed suspect in the area."
+];
+let _radioBusy = false;
+
+function radioStatic(dur, vol, delay = 0) {
+    const buf = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = AC.createBufferSource(); src.buffer = buf;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.8;
+    const g = AC.createGain(); g.gain.value = vol;
+    src.connect(bp); bp.connect(g); g.connect(AC.destination);
+    src.start(AC.currentTime + delay);
+}
+
+function squelch(freq, delay) {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    const t = AC.currentTime + delay;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.01);
+    g.gain.setValueAtTime(0.14, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + 0.1);
+}
+
+function radioChatter(line) {
+    if (_radioBusy) return;
+    _radioBusy = true;
+    const phrase = line || RADIO_LINES[Math.floor(Math.random() * RADIO_LINES.length)];
+
+    // Open squelch: click + static burst
+    squelch(1250, 0);
+    radioStatic(0.14, 0.18, 0.04);
+
+    const finish = () => {
+        squelch(950, 0);
+        radioStatic(0.16, 0.13, 0.02);
+        setTimeout(() => { _radioBusy = false; }, 400);
+    };
+
+    if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(phrase);
+        u.rate = 1.05; u.pitch = 0.7; u.volume = 1;
+        u.onend = finish;
+        u.onerror = finish;
+        setTimeout(() => speechSynthesis.speak(u), 200);
+        // Safety: clear the busy flag even if onend never fires
+        setTimeout(() => { if (_radioBusy) finish(); }, 6000);
+    } else {
+        setTimeout(finish, 700);
+    }
+}
 
 // ── SFX ─────────────────────────────────────────────────────
 function playShoot() {
@@ -326,7 +408,7 @@ const getULvl = id => upgrades[id] || 0;
 let credits = 0, strikes = 0, maxStrikes = 5, gameOver = false, level = 1, frameCount = 0;
 let entities = [], bullets = [], particles = [];
 let keys = {}, shootCooldown = 0, roadOffset = 0, combo = 1, comboTimer = 0;
-let shakeFrames = 0, spawnTimer = null, gameRunning = false;
+let shakeFrames = 0, spawnTimer = null, radioTimer = null, gameRunning = false;
 
 const player = { x:381, y:0, w:38, h:68, baseSpeed:7 };
 // y set properly after canvas height is known
@@ -374,6 +456,13 @@ function resetAndRun() {
     updateHUD(); renderUpgBar();
     scheduleSpawn();
     gameRunning = true;
+
+    // Opening dispatch, then ambient chatter every 25–45s
+    setTimeout(() => { if (gameRunning) radioChatter("Officer Javi, please respond."); }, 1200);
+    if (radioTimer) clearInterval(radioTimer);
+    radioTimer = setInterval(() => {
+        if (gameRunning && !gameOver) radioChatter();
+    }, 25000 + Math.random() * 20000);
 }
 
 function scheduleSpawn() {
@@ -386,6 +475,7 @@ function triggerGameOver() {
     gameOver = true; gameRunning = false;
     stopSiren();
     if (spawnTimer) clearInterval(spawnTimer);
+    if (radioTimer) clearInterval(radioTimer);
     document.getElementById('final-score').innerText  = credits.toLocaleString();
     document.getElementById('go-diff').innerText       = 'Difficulty: ' + difficulty.toUpperCase();
     document.getElementById('gameover-screen').style.display = 'flex';
@@ -464,6 +554,7 @@ window.addEventListener('keydown', e => {
     resumeAC();
     keys[e.code] = true;
     if (e.code === 'KeyS') { AC.resume().then(toggleSiren); }
+    if (e.code === 'KeyR') { AC.resume().then(() => radioChatter()); }
     if (gameOver && (e.code === 'Space' || e.code === 'Enter')) {
         document.getElementById('gameover-screen').style.display = 'none';
         document.getElementById('diff-screen').style.display = 'flex';
@@ -715,6 +806,7 @@ function update() {
         level = newLvl; updateHUD(); playLevelUp();
         burst(canvas.width/2, canvas.height/2, '#ffaa00', 28, true);
         floatText('LEVEL ' + level + '!', canvas.width/2-50, canvas.height/2-50, '#ffaa00');
+        setTimeout(() => radioChatter("Dispatch to Unit 902, threat level rising. Stay sharp."), 800);
         openUpgradeShop(); return;
     }
 
