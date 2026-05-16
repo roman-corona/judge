@@ -63,6 +63,10 @@
         .diff-btn.normal:hover { background: #ffaa0022; box-shadow: 0 0 24px #ffaa0088; }
         .diff-btn.hard   { color: #ff3333; border-color: #ff3333; }
         .diff-btn.hard:hover   { background: #ff333322; box-shadow: 0 0 24px #ff333388; }
+        .diff-btn.training { color: #44ddff; border-color: #44ddff; border-style: dashed; font-size:13px; padding: 12px 28px; }
+        .diff-btn.training:hover { background: #44ddff18; box-shadow: 0 0 24px #44ddff66; }
+        #diff-screen .training-row { margin-top: 20px; }
+        #diff-screen .training-label { font-size:12px; color:#444; margin-bottom:8px; }
         .diff-btn .diff-desc { font-size: 11px; font-weight: normal; color: #666; margin-top: 8px; text-transform: none; letter-spacing: 0; line-height: 1.5; }
 
         /* Game over */
@@ -147,6 +151,13 @@
         <button class="diff-btn hard" onclick="startGame('hard')">
             Commander
             <div class="diff-desc">Fast criminals.<br>Hair-trigger IA.<br>No mercy.</div>
+        </button>
+    </div>
+    <div class="training-row">
+        <div class="training-label">— or —</div>
+        <button class="diff-btn training" onclick="startGame('training')">
+            Training Mode
+            <div class="diff-desc">No IA rules. No game over.<br>Just goof off.</div>
         </button>
     </div>
 </div>
@@ -243,13 +254,15 @@ function toggleSiren() { sirenActive ? stopSiren() : startSiren(); }
 
 // ── Radio chatter (walkie-talkie dispatch) ───────────────────
 const RADIO_LINES = [
-    "Officer Javi, please respond.",
+    "Officer Hahvee, please respond.",
     "Dispatch to Unit 902, suspect headed your way.",
     "All units, be advised, pursuit in progress.",
     "Unit 902, what is your status?",
-    "Nice work out there, Officer Javi.",
+    "Nice work out there, Officer Hahvee.",
     "Control to 902, keep those civilians clear.",
-    "Be advised, armed suspect in the area."
+    "Be advised, armed suspect in the area.",
+    "Unit 902, suspects are getting bold. Stay on them.",
+    "Officer Hahvee, you are clear to engage."
 ];
 let _radioBusy = false;
 
@@ -380,9 +393,10 @@ const ROAD_W     = ROAD_RIGHT - ROAD_LEFT;
 //  DIFFICULTY CONFIG
 // ═══════════════════════════════════════════════════════════════
 const DIFF = {
-    easy:   { criminalChance:0.24, spawnBase:1200, spawnMin:620, criminalSpd:[2.5,1.4], civSpd:[1.6,1.0], maxStrikes:7, creditMult:0.8,  levelFrames:2200 },
-    normal: { criminalChance:0.35, spawnBase:1000, spawnMin:420, criminalSpd:[3.2,1.8], civSpd:[2.0,1.2], maxStrikes:5, creditMult:1.0,  levelFrames:1800 },
-    hard:   { criminalChance:0.48, spawnBase:750,  spawnMin:280, criminalSpd:[4.2,2.4], civSpd:[2.6,1.5], maxStrikes:4, creditMult:1.55, levelFrames:1500 }
+    easy:     { criminalChance:0.24, spawnBase:1200, spawnMin:620, criminalSpd:[2.5,1.4], civSpd:[1.6,1.0], maxStrikes:7,        creditMult:0.8,  levelFrames:2200 },
+    normal:   { criminalChance:0.35, spawnBase:1000, spawnMin:420, criminalSpd:[3.2,1.8], civSpd:[2.0,1.2], maxStrikes:5,        creditMult:1.0,  levelFrames:1800 },
+    hard:     { criminalChance:0.48, spawnBase:750,  spawnMin:280, criminalSpd:[4.2,2.4], civSpd:[2.6,1.5], maxStrikes:4,        creditMult:1.55, levelFrames:1500 },
+    training: { criminalChance:0.35, spawnBase:900,  spawnMin:500, criminalSpd:[2.8,1.4], civSpd:[2.0,1.0], maxStrikes:Infinity, creditMult:1.0,  levelFrames:1800 }
 };
 let difficulty = 'normal', diffCfg = DIFF.normal;
 
@@ -458,7 +472,7 @@ function resetAndRun() {
     gameRunning = true;
 
     // Opening dispatch, then ambient chatter every 25–45s
-    setTimeout(() => { if (gameRunning) radioChatter("Officer Javi, please respond."); }, 1200);
+    setTimeout(() => { if (gameRunning) radioChatter("Officer Hahvee, please respond."); }, 1200);
     if (radioTimer) clearInterval(radioTimer);
     radioTimer = setInterval(() => {
         if (gameRunning && !gameOver) radioChatter();
@@ -486,7 +500,14 @@ function triggerGameOver() {
 // ═══════════════════════════════════════════════════════════════
 function updateHUD() {
     document.getElementById('credits-val').innerText = '$' + credits.toLocaleString();
-    document.getElementById('strikes-val').innerText = strikes + ' / ' + maxStrikes;
+    const sv = document.getElementById('strikes-val');
+    if (difficulty === 'training') {
+        sv.innerText = 'TRAINING';
+        sv.style.color = '#44ddff';
+    } else {
+        sv.innerText = strikes + ' / ' + maxStrikes;
+        sv.style.color = '#ff4444';
+    }
     document.getElementById('level-val').innerText   = level;
     document.getElementById('combo-val').innerText   = 'x' + combo;
     document.getElementById('shop-credits').innerText = credits.toLocaleString();
@@ -806,7 +827,7 @@ function update() {
         level = newLvl; updateHUD(); playLevelUp();
         burst(canvas.width/2, canvas.height/2, '#ffaa00', 28, true);
         floatText('LEVEL ' + level + '!', canvas.width/2-50, canvas.height/2-50, '#ffaa00');
-        setTimeout(() => radioChatter("Dispatch to Unit 902, threat level rising. Stay sharp."), 800);
+        setTimeout(() => radioChatter("Dispatch to Unit 902, threat level rising. Stay sharp, Hahvee."), 800);
         openUpgradeShop(); return;
     }
 
@@ -997,6 +1018,17 @@ function draw() {
         ctx.save(); ctx.globalAlpha=0.1;
         ctx.fillStyle=tick?'#ff0000':'#0044ff';
         ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.restore();
+    }
+
+    // Training mode watermark
+    if(difficulty==='training' && gameRunning){
+        ctx.save();
+        ctx.globalAlpha=0.07;
+        ctx.fillStyle='#44ddff';
+        ctx.font='bold 90px Courier New';
+        ctx.textAlign='center';
+        ctx.fillText('TRAINING', canvas.width/2, canvas.height/2 + 30);
         ctx.restore();
     }
 
