@@ -191,12 +191,12 @@ function startSiren() {
     sirenActive = true;
 
     const masterGain = AC.createGain();
-    masterGain.gain.value = 0.18;
+    masterGain.gain.value = 0.6;
     masterGain.connect(AC.destination);
 
     // Two-tone wail: low saw + high square, each LFO-modulated
-    [[600, 220, 0.85, 'sawtooth', 0.18],
-     [900, 150, 1.15, 'square',   0.07]].forEach(([freq, depth, rate, type, vol]) => {
+    [[600, 220, 0.85, 'sawtooth', 0.5],
+     [900, 150, 1.15, 'square',   0.25]].forEach(([freq, depth, rate, type, vol]) => {
         const osc  = AC.createOscillator();
         const lfo  = AC.createOscillator();
         const lfog = AC.createGain();
@@ -463,7 +463,7 @@ function closeUpgradeShop() {
 window.addEventListener('keydown', e => {
     resumeAC();
     keys[e.code] = true;
-    if (e.code === 'KeyS') { resumeAC(); toggleSiren(); }
+    if (e.code === 'KeyS') { AC.resume().then(toggleSiren); }
     if (gameOver && (e.code === 'Space' || e.code === 'Enter')) {
         document.getElementById('gameover-screen').style.display = 'none';
         document.getElementById('diff-screen').style.display = 'flex';
