@@ -67,6 +67,25 @@
         .diff-btn.training:hover { background: #44ddff18; box-shadow: 0 0 24px #44ddff66; }
         #diff-screen .training-row { margin-top: 20px; }
         #diff-screen .training-label { font-size:12px; color:#444; margin-bottom:8px; }
+
+        /* Officer select */
+        #officer-screen .game-title { font-size:60px; font-weight:bold; letter-spacing:6px; color:#ff2222; text-shadow:0 0 30px #ff0000, 0 0 60px #ff000055; margin-bottom:6px; }
+        #officer-screen .game-sub   { font-size:16px; color:#888; margin-bottom:36px; letter-spacing:1px; }
+        #officer-screen .officer-row { display:flex; gap:24px; }
+        .officer-card {
+            width:200px; padding:24px 20px; border:2px solid #333; border-radius:12px;
+            background:rgba(12,12,20,0.95); cursor:pointer; pointer-events:all;
+            text-align:center; transition:all 0.18s;
+        }
+        .officer-card:hover { transform:translateY(-5px); }
+        .officer-card.javi:hover { border-color:#4477ff; box-shadow:0 0 28px #2244ff66; }
+        .officer-card.toby:hover { border-color:#ffaa00; box-shadow:0 0 28px #ff880066; }
+        .officer-card .oc-car  { font-size:52px; margin-bottom:10px; line-height:1; }
+        .officer-card .oc-name { font-size:20px; font-weight:bold; margin-bottom:4px; }
+        .officer-card.javi .oc-name { color:#4477ff; text-shadow:0 0 10px #2244ff; }
+        .officer-card.toby .oc-name { color:#ffaa00; text-shadow:0 0 10px #ff8800; }
+        .officer-card .oc-unit { font-size:12px; color:#888; margin-bottom:10px; letter-spacing:2px; }
+        .officer-card .oc-desc { font-size:11px; color:#666; line-height:1.6; }
         .diff-btn .diff-desc { font-size: 11px; font-weight: normal; color: #666; margin-top: 8px; text-transform: none; letter-spacing: 0; line-height: 1.5; }
 
         /* Game over */
@@ -135,8 +154,28 @@
     <div id="upgrades-bar"></div>
 </div>
 
+<!-- Officer Select Screen -->
+<div class="overlay" id="officer-screen" style="display:flex;">
+    <div class="game-title">JUDGE JAVI</div>
+    <div class="game-sub">Phoenix PD · Unit 902 &nbsp;|&nbsp; Choose your officer</div>
+    <div class="officer-row">
+        <div class="officer-card javi" onclick="selectOfficer('javi')">
+            <div class="oc-car">🚔</div>
+            <div class="oc-name">Officer Javi</div>
+            <div class="oc-unit">UNIT 902 · PHOENIX PD</div>
+            <div class="oc-desc">Blue &amp; white cruiser.<br>Male dispatch voice.<br>The original.</div>
+        </div>
+        <div class="officer-card toby" onclick="selectOfficer('toby')">
+            <div class="oc-car">🚓</div>
+            <div class="oc-name">Officer Toby</div>
+            <div class="oc-unit">UNIT 911 · PHOENIX PD</div>
+            <div class="oc-desc">Black &amp; gold cruiser.<br>Female dispatch voice.<br>Just as ruthless.</div>
+        </div>
+    </div>
+</div>
+
 <!-- Difficulty Screen -->
-<div class="overlay" id="diff-screen" style="display:flex;">
+<div class="overlay" id="diff-screen" style="display:none;">
     <div class="game-title">JUDGE JAVI</div>
     <div class="game-sub">Phoenix PD · Unit 902 &nbsp;|&nbsp; Serve. Protect. Collect.</div>
     <div class="diff-row">
@@ -252,17 +291,58 @@ function stopSiren() {
 
 function toggleSiren() { sirenActive ? stopSiren() : startSiren(); }
 
+// ── Officer selection ────────────────────────────────────────
+let selectedOfficer = 'javi';
+
+function selectOfficer(name) {
+    selectedOfficer = name;
+    document.getElementById('officer-screen').style.display = 'none';
+    document.getElementById('diff-screen').style.display   = 'flex';
+}
+
+// ── Dispatch voice loading ───────────────────────────────────
+let _voiceFemale = null, _voiceMale = null;
+function loadDispatchVoices() {
+    const all = speechSynthesis.getVoices();
+    if (!all.length) return;
+    _voiceFemale = all.find(v => /samantha|zira|karen|victoria|google uk english female|female/i.test(v.name))
+                || all.find(v => v.lang.startsWith('en'));
+    _voiceMale   = all.find(v => /david|mark|alex|daniel|microsoft david|google uk english male/i.test(v.name))
+                || all.find(v => v.lang.startsWith('en') && v !== _voiceFemale);
+}
+if (window.speechSynthesis) {
+    speechSynthesis.addEventListener('voiceschanged', loadDispatchVoices);
+    loadDispatchVoices();
+}
+
 // ── Radio chatter (walkie-talkie dispatch) ───────────────────
-const RADIO_LINES = [
+const JAVI_LINES = [
     "Officer Hahvee, please respond.",
-    "Dispatch to Unit 902, suspect headed your way.",
+    "Dispatch to Unit 902, what is your status?",
     "All units, be advised, pursuit in progress.",
-    "Unit 902, what is your status?",
+    "Unit 902, suspect is heading northbound.",
     "Nice work out there, Officer Hahvee.",
     "Control to 902, keep those civilians clear.",
-    "Be advised, armed suspect in the area.",
+    "Be advised, armed suspect in your area.",
     "Unit 902, suspects are getting bold. Stay on them.",
-    "Officer Hahvee, you are clear to engage."
+    "Officer Hahvee, you are clear to engage.",
+    "902, watch your six. Backup is en route.",
+    "Officer Hahvee, dispatch confirms, you are authorized.",
+    "Unit 902, the city is counting on you.",
+];
+const TOBY_LINES = [
+    "Officer Toby, please respond.",
+    "Dispatch to Unit 911, what is your status?",
+    "All units, be advised, we have a pursuit in progress.",
+    "Unit 911, suspect last seen heading your way.",
+    "Good work, Officer Toby. Keep it up.",
+    "Control to 911, watch for civilian crossings.",
+    "Be advised, multiple suspects reported in the area.",
+    "Unit 911, you are authorized to pursue.",
+    "Officer Toby, stay sharp out there.",
+    "911, headquarters is watching. Do not disappoint.",
+    "Officer Toby, we have reports of criminal activity nearby.",
+    "Unit 911, the city needs you. Stay focused.",
 ];
 let _radioBusy = false;
 
@@ -292,9 +372,10 @@ function squelch(freq, delay) {
 function radioChatter(line) {
     if (_radioBusy) return;
     _radioBusy = true;
-    const phrase = line || RADIO_LINES[Math.floor(Math.random() * RADIO_LINES.length)];
+    const isToby = selectedOfficer === 'toby';
+    const pool   = isToby ? TOBY_LINES : JAVI_LINES;
+    const phrase = line || pool[Math.floor(Math.random() * pool.length)];
 
-    // Open squelch: click + static burst
     squelch(1250, 0);
     radioStatic(0.14, 0.18, 0.04);
 
@@ -306,11 +387,16 @@ function radioChatter(line) {
 
     if (window.speechSynthesis) {
         const u = new SpeechSynthesisUtterance(phrase);
-        u.rate = 1.05; u.pitch = 0.7; u.volume = 1;
-        u.onend = finish;
-        u.onerror = finish;
+        if (isToby) {
+            u.pitch = 1.35; u.rate = 1.0;
+            if (_voiceFemale) u.voice = _voiceFemale;
+        } else {
+            u.pitch = 0.75; u.rate = 1.05;
+            if (_voiceMale) u.voice = _voiceMale;
+        }
+        u.volume = 1;
+        u.onend = finish; u.onerror = finish;
         setTimeout(() => speechSynthesis.speak(u), 200);
-        // Safety: clear the busy flag even if onend never fires
         setTimeout(() => { if (_radioBusy) finish(); }, 6000);
     } else {
         setTimeout(finish, 700);
@@ -472,7 +558,10 @@ function resetAndRun() {
     gameRunning = true;
 
     // Opening dispatch, then ambient chatter every 25–45s
-    setTimeout(() => { if (gameRunning) radioChatter("Officer Hahvee, please respond."); }, 1200);
+    const opener = selectedOfficer === 'toby'
+        ? "Officer Toby, please respond."
+        : "Officer Hahvee, please respond.";
+    setTimeout(() => { if (gameRunning) radioChatter(opener); }, 1200);
     if (radioTimer) clearInterval(radioTimer);
     radioTimer = setInterval(() => {
         if (gameRunning && !gameOver) radioChatter();
@@ -578,7 +667,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'KeyR') { AC.resume().then(() => radioChatter()); }
     if (gameOver && (e.code === 'Space' || e.code === 'Enter')) {
         document.getElementById('gameover-screen').style.display = 'none';
-        document.getElementById('diff-screen').style.display = 'flex';
+        document.getElementById('officer-screen').style.display = 'flex';
     }
     if (document.getElementById('upgrade-screen').style.display === 'flex' &&
         (e.code === 'Enter' || e.code === 'Escape')) closeUpgradeShop();
@@ -742,67 +831,149 @@ function drawRoad() {
 
 function drawCar(x, y, w, h, bodyColor, isPlayer, hitFlash) {
     ctx.save();
+    const cx = x + w / 2;
+    const r  = 5;
+    const isToby = isPlayer && selectedOfficer === 'toby';
+
+    // ── Player glow ───────────────────────────────────────────
+    if (isPlayer) {
+        ctx.shadowColor = isToby ? '#ff8800' : '#1144ff';
+        ctx.shadowBlur  = 22;
+    }
 
     // ── Body ──────────────────────────────────────────────────
     if (isPlayer) {
-        ctx.shadowColor = '#2255ff';
-        ctx.shadowBlur  = 18;
+        // Two-tone police livery: dark top, light bottom, diagonal stripe
+        ctx.fillStyle = '#e8e8ec';          // lower body white
+        rrect(x, y + h * 0.42, w, h * 0.44, r); ctx.fill();
+        ctx.fillStyle = isToby ? '#111118' : '#0a2066';  // upper body dark
+        rrect(x, y + h * 0.12, w, h * 0.32, 2); ctx.fill();
+        // Diagonal accent stripe
+        ctx.shadowBlur = 0;
+        ctx.fillStyle  = isToby ? '#bb7700' : '#1a6bdd';
+        ctx.beginPath();
+        ctx.moveTo(x,     y + h * 0.42);
+        ctx.lineTo(x + w, y + h * 0.35);
+        ctx.lineTo(x + w, y + h * 0.47);
+        ctx.lineTo(x,     y + h * 0.54);
+        ctx.closePath(); ctx.fill();
+        // Body border
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1;
+        rrect(x, y + h * 0.12, w, h * 0.74, r); ctx.stroke();
+    } else {
+        ctx.shadowBlur = 0;
+        const bg = ctx.createLinearGradient(x, y, x + w, y + h);
+        bg.addColorStop(0, lighten(bodyColor, 38));
+        bg.addColorStop(0.5, bodyColor);
+        bg.addColorStop(1, darken(bodyColor, 15));
+        ctx.fillStyle = bg;
+        rrect(x, y + h * 0.12, w, h * 0.74, r); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 0.8;
+        rrect(x, y + h * 0.12, w, h * 0.74, r); ctx.stroke();
+        // Door line
+        ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(x+w*0.12, y+h*0.39); ctx.lineTo(x+w*0.88, y+h*0.39); ctx.stroke();
+        // Hood crease
+        ctx.beginPath(); ctx.moveTo(x+w*0.14, y+h*0.22); ctx.lineTo(x+w*0.86, y+h*0.22); ctx.stroke();
     }
-    ctx.fillStyle = isPlayer ? '#1a66ee' : bodyColor;
-    ctx.fillRect(x, y + h * 0.14, w, h * 0.72);
 
-    // ── Roof ──────────────────────────────────────────────────
+    // ── Roof cabin ────────────────────────────────────────────
     ctx.shadowBlur = 0;
-    ctx.fillStyle  = isPlayer ? '#003399' : darken(bodyColor, 28);
-    ctx.fillRect(x + w * 0.1, y + h * 0.04, w * 0.8, h * 0.46);
+    const roofBase = isPlayer ? (isToby ? '#0a0a0c' : '#061244') : darken(bodyColor, 36);
+    const rg = ctx.createLinearGradient(x, y, x + w, y + h * 0.5);
+    rg.addColorStop(0, lighten(roofBase, 22)); rg.addColorStop(1, roofBase);
+    ctx.fillStyle = rg;
+    rrect(x + w * 0.1, y + h * 0.05, w * 0.8, h * 0.44, r); ctx.fill();
 
     // ── Windshield ────────────────────────────────────────────
-    ctx.fillStyle = 'rgba(160,210,255,0.55)';
-    const wsY = isPlayer ? y + h * 0.07 : y + h * 0.31;
-    ctx.fillRect(x + w * 0.14, wsY, w * 0.72, h * 0.2);
-    // Glare
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-    ctx.fillRect(x + w * 0.16, wsY + 2, w * 0.18, h * 0.06);
+    const wsY = isPlayer ? y + h * 0.08 : y + h * 0.28;
+    ctx.fillStyle = 'rgba(140,200,255,0.52)';
+    rrect(x + w * 0.14, wsY, w * 0.72, h * 0.21, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(x + w * 0.16, wsY + 2, w * 0.15, h * 0.05);
+    // Rear window for NPCs
+    if (!isPlayer) {
+        ctx.fillStyle = 'rgba(120,175,225,0.3)';
+        rrect(x + w * 0.16, y + h * 0.63, w * 0.68, h * 0.14, 2); ctx.fill();
+    }
 
-    // ── Wheels ────────────────────────────────────────────────
-    ctx.fillStyle = '#111';
-    ctx.fillRect(x - 4,          y + h * 0.17, w * 0.22, h * 0.13);
-    ctx.fillRect(x + w - w*0.22 + 4, y + h * 0.17, w * 0.22, h * 0.13);
-    ctx.fillRect(x - 4,          y + h * 0.66, w * 0.22, h * 0.13);
-    ctx.fillRect(x + w - w*0.22 + 4, y + h * 0.66, w * 0.22, h * 0.13);
-    // Hubcaps
-    ctx.fillStyle = '#444';
-    [[x + w*0.07, y+h*0.235],[x + w*0.815, y+h*0.235],
-     [x + w*0.07, y+h*0.725],[x + w*0.815, y+h*0.725]].forEach(([cx,cy]) => {
-        ctx.beginPath(); ctx.arc(cx, cy, w*0.06, 0, Math.PI*2); ctx.fill();
+    // ── Wing mirrors ──────────────────────────────────────────
+    ctx.fillStyle = isPlayer ? (isToby ? '#2a2a22' : '#182866') : darken(bodyColor, 22);
+    ctx.fillRect(x - 4, y + h * 0.26, 4, 5);
+    ctx.fillRect(x + w, y + h * 0.26, 4, 5);
+
+    // ── Wheels (circular) ─────────────────────────────────────
+    const wr   = w * 0.145;
+    const wpos = [
+        [x - wr * 0.55,     y + h * 0.15 + wr],
+        [x + w - wr * 1.45, y + h * 0.15 + wr],
+        [x - wr * 0.55,     y + h * 0.65 + wr],
+        [x + w - wr * 1.45, y + h * 0.65 + wr],
+    ];
+    wpos.forEach(([wcx, wcy]) => {
+        ctx.fillStyle = '#0f0f0f';                                             // tyre
+        ctx.beginPath(); ctx.arc(wcx, wcy, wr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#484848';                                             // rim
+        ctx.beginPath(); ctx.arc(wcx, wcy, wr * 0.63, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 0.8;                     // spokes
+        for (let s = 0; s < 3; s++) {
+            const a = (s / 3) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(wcx + Math.cos(a)*wr*0.58, wcy + Math.sin(a)*wr*0.58);
+            ctx.lineTo(wcx - Math.cos(a)*wr*0.58, wcy - Math.sin(a)*wr*0.58);
+            ctx.stroke();
+        }
+        ctx.fillStyle = isPlayer ? (isToby ? '#aaaa88' : '#aabbee') : '#888'; // hubcap
+        ctx.beginPath(); ctx.arc(wcx, wcy, wr * 0.3, 0, Math.PI * 2); ctx.fill();
     });
 
+    // ── Police-specific details ───────────────────────────────
     if (isPlayer) {
-        // ── Flashing light bar ────────────────────────────────
+        // Light bar housing
+        ctx.fillStyle = '#111';
+        ctx.fillRect(x + 1, y + h * 0.12, w - 2, 8);
+        // Flashing lights
         const tick = Math.floor(Date.now() / 115) % 2;
+        ctx.shadowBlur = 26;
         ctx.shadowColor = tick ? '#ff2222' : '#2244ff';
-        ctx.shadowBlur  = 20;
         ctx.fillStyle   = tick ? '#ff3333' : '#2244ff';
-        ctx.fillRect(x + 2,      y + h * 0.13, w * 0.45, 7);
+        ctx.fillRect(x + 3,        y + h * 0.13, w * 0.43, 6);
         ctx.shadowColor = tick ? '#2244ff' : '#ff2222';
         ctx.fillStyle   = tick ? '#2244ff' : '#ff3333';
-        ctx.fillRect(x + w * 0.5, y + h * 0.13, w * 0.46, 7);
-        ctx.shadowBlur  = 0;
-        // ── Headlights ────────────────────────────────────────
-        ctx.shadowColor = '#ffffaa'; ctx.shadowBlur = 12;
-        ctx.fillStyle   = '#ffffcc';
-        ctx.fillRect(x + 2,          y + h * 0.84, w * 0.22, 5);
-        ctx.fillRect(x + w - w*0.24, y + h * 0.84, w * 0.22, 5);
+        ctx.fillRect(x + w * 0.5,  y + h * 0.13, w * 0.46, 6);
+        ctx.shadowBlur = 0;
+        // "POLICE" text on roof
+        const textSize = Math.max(5, Math.floor(w * 0.19));
+        ctx.fillStyle = isToby ? '#ffaa00' : '#88aaff';
+        ctx.font = `bold ${textSize}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('POLICE', cx, y + h * 0.295);
+        // Unit number
+        ctx.fillStyle = 'rgba(255,255,255,0.42)';
+        ctx.font = `${Math.max(4, Math.floor(w * 0.145))}px sans-serif`;
+        ctx.fillText(isToby ? '911' : '902', cx, y + h * 0.395);
+        ctx.textBaseline = 'alphabetic';
+        // Push bumper
+        ctx.fillStyle = '#667';
+        ctx.fillRect(x + w * 0.07, y + h * 0.875, w * 0.86, 4);
+        ctx.fillRect(x + w * 0.07, y + h * 0.895, w * 0.28, 2);
+        ctx.fillRect(x + w * 0.65, y + h * 0.895, w * 0.28, 2);
+        // Headlights
+        ctx.shadowColor = '#ffffaa'; ctx.shadowBlur = 16;
+        ctx.fillStyle = '#ffffcc';
+        ctx.fillRect(x + 1,           y + h * 0.86, w * 0.21, 5);
+        ctx.fillRect(x + w - w * 0.22, y + h * 0.86, w * 0.21, 5);
+        ctx.shadowBlur = 0;
     } else {
-        // ── Tail lights ───────────────────────────────────────
+        // NPC tail lights
         ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8;
-        ctx.fillStyle   = '#ff3300';
-        ctx.fillRect(x + 2,          y + h * 0.87, w * 0.18, 4);
-        ctx.fillRect(x + w - w*0.2,  y + h * 0.87, w * 0.18, 4);
+        ctx.fillStyle = '#ff3300';
+        ctx.fillRect(x + 2,           y + h * 0.87, w * 0.18, 4);
+        ctx.fillRect(x + w - w * 0.2, y + h * 0.87, w * 0.18, 4);
+        ctx.shadowBlur = 0;
         if (hitFlash) {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle  = 'rgba(255,255,255,0.35)';
-            ctx.fillRect(x, y + h * 0.14, w, h * 0.72);
+            ctx.fillStyle = 'rgba(255,255,255,0.33)';
+            rrect(x, y + h * 0.12, w, h * 0.74, r); ctx.fill();
         }
     }
 
@@ -827,7 +998,12 @@ function update() {
         level = newLvl; updateHUD(); playLevelUp();
         burst(canvas.width/2, canvas.height/2, '#ffaa00', 28, true);
         floatText('LEVEL ' + level + '!', canvas.width/2-50, canvas.height/2-50, '#ffaa00');
-        setTimeout(() => radioChatter("Dispatch to Unit 902, threat level rising. Stay sharp, Hahvee."), 800);
+        setTimeout(() => {
+            const msg = selectedOfficer === 'toby'
+                ? "Dispatch to Unit 911, threat level rising. Stay sharp, Officer Toby."
+                : "Dispatch to Unit 902, threat level rising. Stay sharp, Hahvee.";
+            radioChatter(msg);
+        }, 800);
         openUpgradeShop(); return;
     }
 
