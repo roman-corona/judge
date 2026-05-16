@@ -323,9 +323,9 @@ const getULvl = id => upgrades[id] || 0;
 // ═══════════════════════════════════════════════════════════════
 //  GAME STATE
 // ═══════════════════════════════════════════════════════════════
-let credits, strikes, maxStrikes, gameOver, level, frameCount;
-let entities, bullets, particles;
-let keys = {}, shootCooldown, roadOffset, combo, comboTimer;
+let credits = 0, strikes = 0, maxStrikes = 5, gameOver = false, level = 1, frameCount = 0;
+let entities = [], bullets = [], particles = [];
+let keys = {}, shootCooldown = 0, roadOffset = 0, combo = 1, comboTimer = 0;
 let shakeFrames = 0, spawnTimer = null, gameRunning = false;
 
 const player = { x:381, y:0, w:38, h:68, baseSpeed:7 };
