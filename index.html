@@ -1209,12 +1209,20 @@ function draw() {
     }
 
     if(shakeFrames>0) ctx.restore();
+}
 
-    requestAnimationFrame(()=>{ update(); draw(); });
+function loop() {
+    try { update(); } catch(e) { console.error('[update]', e); }
+    try { draw();   } catch(e) {
+        console.error('[draw]', e);
+        // Reset any broken save stack
+        for(let i=0;i<8;i++) try{ ctx.restore(); }catch(_){}
+    }
+    requestAnimationFrame(loop);   // always reschedule — never let the loop die
 }
 
 // ── Boot ────────────────────────────────────────────────────
-draw();
+loop();
 </script>
 </body>
 </html>
